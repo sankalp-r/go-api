@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/go-retryablehttp"
 	cache2 "github.com/sankalp-r/go-api/pkg/cache"
 	"github.com/sankalp-r/go-api/pkg/model"
 	"go.uber.org/zap"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"time"
 )
 
 const (
@@ -24,15 +26,28 @@ const (
 	noneMatchHeader      = "If-None-Match"
 )
 
+// InMemory cache
+var cache cache2.Storage
+var httpClient *retryablehttp.Client
+
+func init() {
+	cache = cache2.NewStorage()
+	httpClient = retryablehttp.NewClient()
+	httpClient.RetryMax = 3
+	httpClient.RetryWaitMin = 10 * time.Millisecond
+	httpClient.RetryWaitMax = 50 * time.Millisecond
+}
+
+// response for storing fetched data
 type response struct {
 	res *model.DataContainer
 	err error
 }
 
-var cache cache2.Storage = cache2.NewStorage()
-
 func GetData(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
+
+	// sortQuery validation
 	if params.Has(sortQuery) && !isSortKeyValid(params.Get(sortQuery)) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, invalidRequest)
@@ -40,6 +55,7 @@ func GetData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit := 0
+	//limitQuery validation
 	if params.Has(limitQuery) {
 		if ok, val := isLimitValid(params.Get(limitQuery)); ok {
 			limit = val
@@ -92,7 +108,7 @@ func getSeedUrl() []string {
 }
 
 func fetchData(url string) (*model.DataContainer, error) {
-	request, err := http.NewRequest("GET", url, nil)
+	request, err := retryablehttp.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +117,7 @@ func fetchData(url string) (*model.DataContainer, error) {
 		request.Header.Set(noneMatchHeader, etag.Key)
 	}
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := httpClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +136,7 @@ func fetchData(url string) (*model.DataContainer, error) {
 		zap.L().Debug("data fetch", zap.String("url", url), zap.Int("Status", http.StatusNotModified))
 	default:
 		zap.L().Error("failed to fetch data", zap.String("url", url), zap.Int("Status", response.StatusCode))
+		return nil, fmt.Errorf("internal service error: %d", http.StatusInternalServerError)
 	}
 
 	defer response.Body.Close()
