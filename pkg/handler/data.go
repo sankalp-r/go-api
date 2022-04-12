@@ -26,25 +26,34 @@ const (
 	noneMatchHeader      = "If-None-Match"
 )
 
-// InMemory cache
-var cache cache2.Storage
-var httpClient *retryablehttp.Client
-
-func init() {
-	cache = cache2.NewStorage()
-	httpClient = retryablehttp.NewClient()
-	httpClient.RetryMax = 3
-	httpClient.RetryWaitMin = 10 * time.Millisecond
-	httpClient.RetryWaitMax = 50 * time.Millisecond
-}
-
 // response for storing fetched data
 type response struct {
 	res *model.DataContainer
 	err error
 }
 
-func GetData(w http.ResponseWriter, r *http.Request) {
+type DataHandler struct {
+	cache      cache2.Storage
+	httpClient *retryablehttp.Client
+	seedUrl    []string
+}
+
+func NewDataHandler(seedUrl []string) *DataHandler {
+	cache := cache2.NewStorage()
+	httpClient := retryablehttp.NewClient()
+	httpClient.RetryMax = 3
+	httpClient.RetryWaitMin = 10 * time.Millisecond
+	httpClient.RetryWaitMax = 50 * time.Millisecond
+	httpClient.Logger = nil
+
+	return &DataHandler{
+		cache:      cache,
+		httpClient: httpClient,
+		seedUrl:    seedUrl,
+	}
+}
+
+func (d *DataHandler) GetData(w http.ResponseWriter, r *http.Request) {
 	params := r.URL.Query()
 
 	// sortQuery validation
@@ -68,18 +77,17 @@ func GetData(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	seedUrl := getSeedUrl()
-	responseChan := make(chan response, len(seedUrl))
+	responseChan := make(chan response, len(d.seedUrl))
 
-	for _, url := range seedUrl {
+	for _, url := range d.seedUrl {
 		go func(url string) {
-			data, err := fetchData(url)
+			data, err := d.fetchData(url)
 			responseChan <- response{res: data, err: err}
 		}(url)
 	}
 
 	var response []model.Data
-	for i := 0; i < len(seedUrl); i++ {
+	for i := 0; i < len(d.seedUrl); i++ {
 		result := <-responseChan
 		if result.err == nil {
 			response = append(response, result.res.Data...)
@@ -95,11 +103,12 @@ func GetData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-Type", "application/json")
 	w.Write(bytes)
 
 }
 
-func getSeedUrl() []string {
+func GetSeedUrl() []string {
 	return []string{
 		"https://raw.githubusercontent.com/assignment132/assignment/main/duckduckgo.json",
 		"https://raw.githubusercontent.com/assignment132/assignment/main/google.json",
@@ -107,17 +116,18 @@ func getSeedUrl() []string {
 	}
 }
 
-func fetchData(url string) (*model.DataContainer, error) {
+func (d *DataHandler) fetchData(url string) (*model.DataContainer, error) {
 	request, err := retryablehttp.NewRequest("GET", url, nil)
 	if err != nil {
+		zap.L().Error("error creating request", zap.Error(err))
 		return nil, err
 	}
-	etag := cache.Get(url)
+	etag := d.cache.Get(url)
 	if etag != nil {
 		request.Header.Set(noneMatchHeader, etag.Key)
 	}
 
-	response, err := httpClient.Do(request)
+	response, err := d.httpClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +139,7 @@ func fetchData(url string) (*model.DataContainer, error) {
 		if err != nil {
 			return nil, err
 		}
-		cache.Set(url, cache2.Etag{Key: response.Header.Get(etagHeader), Data: body})
+		d.cache.Set(url, cache2.Etag{Key: response.Header.Get(etagHeader), Data: body})
 		zap.L().Debug("data fetch", zap.String("url", url), zap.Int("Status", http.StatusOK))
 	case http.StatusNotModified:
 		body = etag.Data
@@ -142,6 +152,7 @@ func fetchData(url string) (*model.DataContainer, error) {
 	defer response.Body.Close()
 	var dataContainer model.DataContainer
 	if err = json.Unmarshal(body, &dataContainer); err != nil {
+		zap.L().Error("error in unmarshalling:", zap.Error(err))
 		return nil, err
 	}
 	return &dataContainer, nil

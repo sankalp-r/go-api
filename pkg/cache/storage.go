@@ -3,16 +3,20 @@ package cache
 import "sync"
 
 type Etag struct {
-	Key  string
+	// Key stores etag value
+	Key string
+	// Data is HTTP response
 	Data []byte
 }
 
+// Storage interface for HTTP response caching
 type Storage interface {
 	Get(key string) *Etag
 	Set(key string, etag Etag)
 	Delete(key string)
 }
 
+// InMemoryStore implements in-memory cache
 type InMemoryStore struct {
 	cache map[string]*Etag
 	sync.RWMutex

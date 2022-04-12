@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-api
+spec:
+  selector:
+    matchLabels:
+      app: go-api
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: go-api
+    spec:
+      containers:
+        - name: go-api
+          image: sankalprangare/go-api
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 410m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: go-api
+  ports:
+    - port: 80
+      targetPort: 8080

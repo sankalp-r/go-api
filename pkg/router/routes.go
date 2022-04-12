@@ -17,6 +17,6 @@ var routes = []Route{
 		"GetData",
 		"GET",
 		"/data",
-		handler.GetData,
+		handler.NewDataHandler(handler.GetSeedUrl()).GetData,
 	},
 }
