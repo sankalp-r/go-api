@@ -2,7 +2,8 @@ package model
 
 // DataContainer for stroring collection of Data
 type DataContainer struct {
-	Data []Data `json:"data"`
+	Data  []Data `json:"data"`
+	Count int    `json:"count"`
 }
 
 // Data for storing the data entity

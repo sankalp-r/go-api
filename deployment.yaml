@@ -1,3 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: go-api
+  ports:
+    - port: 80
+      targetPort: 8080
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,7 +31,7 @@ spec:
     spec:
       containers:
         - name: go-api
-          image: sankalprangare/go-api
+          image: shankube/go-api:v0.0.1
           ports:
             - containerPort: 8080
           resources:
@@ -29,15 +41,8 @@ spec:
             limits:
               cpu: 410m
               memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: go-api
-spec:
-  type: LoadBalancer
-  selector:
-    app: go-api
-  ports:
-    - port: 80
-      targetPort: 8080

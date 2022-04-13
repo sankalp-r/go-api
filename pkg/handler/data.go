@@ -54,6 +54,7 @@ func NewDataHandler(seedUrl []string) *DataHandler {
 }
 
 func (d *DataHandler) GetData(w http.ResponseWriter, r *http.Request) {
+	zap.L().Info("request received", zap.String("url", r.URL.String()))
 	params := r.URL.Query()
 
 	// sortQuery validation
@@ -99,12 +100,15 @@ func (d *DataHandler) GetData(w http.ResponseWriter, r *http.Request) {
 	bytes, err := json.Marshal(resultContainer)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		zap.L().Error("internal server error", zap.Error(err))
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
 	w.Header().Add("Content-Type", "application/json")
-	w.Write(bytes)
+	_, err = w.Write(bytes)
+	if err != nil {
+		zap.L().Error("error in returning response", zap.Error(err))
+	}
 
 }
 
@@ -170,7 +174,7 @@ func sortData(res []model.Data, sortType string, limit int) model.DataContainer 
 	if limit >= 1 && limit <= len(res) {
 		res = res[:limit]
 	}
-	sortedResult := model.DataContainer{Data: res}
+	sortedResult := model.DataContainer{Data: res, Count: len(res)}
 	return sortedResult
 }
 

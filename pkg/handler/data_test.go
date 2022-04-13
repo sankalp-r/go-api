@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const testData = `{"data":[{"url":"www.test.com/abc1","views":1000,"relevanceScore":0.1},{"url":"www.test.com/abc2","views":3000,"relevanceScore":0.3},{"url":"www.test.com/abc3","views":2000,"relevanceScore":0.2}]}`
+const testData = `{"data":[{"url":"www.test.com/abc1","views":1000,"relevanceScore":0.1},{"url":"www.test.com/abc2","views":3000,"relevanceScore":0.3},{"url":"www.test.com/abc3","views":2000,"relevanceScore":0.2}],"count":3}`
 
 func TestGetData(t *testing.T) {
 	testSeedServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,23 +35,23 @@ func TestGetData(t *testing.T) {
 		{
 			name:                 "with sort by views",
 			request:              "/api/v1/data?sortKey=views",
-			expectedResponse:     `{"data":[{"url":"www.test.com/abc1","views":1000,"relevanceScore":0.1},{"url":"www.test.com/abc3","views":2000,"relevanceScore":0.2},{"url":"www.test.com/abc2","views":3000,"relevanceScore":0.3}]}`,
+			expectedResponse:     `{"data":[{"url":"www.test.com/abc1","views":1000,"relevanceScore":0.1},{"url":"www.test.com/abc3","views":2000,"relevanceScore":0.2},{"url":"www.test.com/abc2","views":3000,"relevanceScore":0.3}],"count":3}`,
 			expectedResponseCode: 200,
 		},
 		{
 			name:                 "with sort by relevance score",
 			request:              "/api/v1/data?sortKey=relevanceScore",
-			expectedResponse:     `{"data":[{"url":"www.test.com/abc1","views":1000,"relevanceScore":0.1},{"url":"www.test.com/abc3","views":2000,"relevanceScore":0.2},{"url":"www.test.com/abc2","views":3000,"relevanceScore":0.3}]}`,
+			expectedResponse:     `{"data":[{"url":"www.test.com/abc1","views":1000,"relevanceScore":0.1},{"url":"www.test.com/abc3","views":2000,"relevanceScore":0.2},{"url":"www.test.com/abc2","views":3000,"relevanceScore":0.3}],"count":3}`,
 			expectedResponseCode: 200,
 		},
 		{
 			name:                 "with sort by relevance score and limit",
 			request:              "/api/v1/data?sortKey=relevanceScore&limit=2",
-			expectedResponse:     `{"data":[{"url":"www.test.com/abc1","views":1000,"relevanceScore":0.1},{"url":"www.test.com/abc3","views":2000,"relevanceScore":0.2}]}`,
+			expectedResponse:     `{"data":[{"url":"www.test.com/abc1","views":1000,"relevanceScore":0.1},{"url":"www.test.com/abc3","views":2000,"relevanceScore":0.2}],"count":2}`,
 			expectedResponseCode: 200,
 		},
 		{
-			name:                 "Request with invalid sortkey",
+			name:                 "Request with invalid sortKey",
 			request:              "/api/v1/data?sortKey=rv",
 			expectedResponse:     "Invalid request",
 			expectedResponseCode: 400,
